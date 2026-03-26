@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import locale
 import math
 import subprocess
 import sys
@@ -27,6 +28,385 @@ DEFAULT_NOZZLE_TEMPERATURE_C = 205
 DEFAULT_BED_TEMPERATURE_C = 60
 DEFAULT_FAN_SPEED = 255
 _RUNTIME_DEPS: tuple[object, object, object, object] | None = None
+GUI_LANGUAGE_NAMES = {"en": "English", "ru": "Русский"}
+GUI_TRANSLATIONS: dict[str, dict[str, str]] = {
+    "en": {
+        "app_title": "Negative To Relief",
+        "help_default_title": "Parameter Help",
+        "help_default_text": "Hover over a parameter or click into a field to see a short explanation here.",
+        "frame_files": "Files",
+        "frame_exports": "Exports",
+        "frame_processing": "Image Processing",
+        "frame_geometry": "Geometry",
+        "frame_print": "Print",
+        "frame_speed": "Speed And Temperatures",
+        "frame_description": "Description",
+        "frame_preview": "Heightmap Preview",
+        "frame_log": "Log",
+        "label_input_image": "Input image",
+        "label_output_folder": "Output folder",
+        "label_language": "Language",
+        "button_browse": "Browse",
+        "button_generate": "Generate",
+        "toggle_gcode": "G-code",
+        "toggle_obj": "OBJ mesh",
+        "toggle_stl": "STL mesh",
+        "toggle_invert": "Invert source image",
+        "toggle_autocontrast": "Auto contrast",
+        "field_gamma": "Gamma",
+        "field_blur_radius": "Blur radius",
+        "field_width_mm": "Width (mm)",
+        "field_depth_mm": "Depth (mm)",
+        "field_relief_height": "Relief height (mm)",
+        "field_base_thickness": "Base thickness (mm)",
+        "field_resolution_x": "Resolution X",
+        "field_resolution_y": "Resolution Y",
+        "field_line_width": "Line width (mm)",
+        "field_layer_height": "Layer height (mm)",
+        "field_filament_diameter": "Filament dia. (mm)",
+        "field_origin_x": "Origin X (mm)",
+        "field_origin_y": "Origin Y (mm)",
+        "field_extrusion_multiplier": "Extrusion multiplier",
+        "field_print_speed": "Print",
+        "field_first_layer_speed": "First layer",
+        "field_travel_speed": "Travel",
+        "field_z_speed": "Z speed",
+        "field_z_hop": "Z hop",
+        "field_nozzle_temperature": "Nozzle C",
+        "field_bed_temperature": "Bed C",
+        "field_fan_speed": "Fan 0-255",
+        "preview_placeholder": "Preview appears after generation.",
+        "preview_saved_to": "Preview saved to:",
+        "dialog_input_title": "Choose an input image",
+        "dialog_output_title": "Choose output folder",
+        "filetype_images": "Images",
+        "filetype_all": "All files",
+        "error_generation_failed": "Generation failed",
+        "info_generation_completed": "Generation completed",
+        "status_heightmap_preview": "Heightmap preview: {path}",
+        "status_print_size": "Print size: {width:.2f} x {depth:.2f} x {height:.2f} mm",
+        "status_gcode": "G-code: {path}",
+        "status_layers": "Layers: {layers}, segments: {segments}, filament: {filament:.3f} m",
+        "status_obj": "OBJ mesh: {path}",
+        "status_stl": "STL mesh: {path}",
+        "status_mesh": "Mesh: {vertices} vertices, {triangles} triangles",
+        "msg_heightmap_saved": "Heightmap saved to {path}",
+        "msg_gcode_saved": "G-code saved to {path}",
+        "msg_obj_saved": "OBJ saved to {path}",
+        "msg_stl_saved": "STL saved to {path}",
+        "label_width": "Width",
+        "label_relief_height_short": "Relief height",
+        "label_base_thickness_short": "Base thickness",
+        "label_gamma_short": "Gamma",
+        "label_blur_radius_short": "Blur radius",
+        "label_line_width": "Line width",
+        "label_layer_height_short": "Layer height",
+        "label_filament_diameter_short": "Filament diameter",
+        "label_print_speed_short": "Print speed",
+        "label_first_layer_speed_short": "First layer speed",
+        "label_travel_speed_short": "Travel speed",
+        "label_z_speed_short": "Z speed",
+        "label_z_hop_short": "Z hop",
+        "label_extrusion_multiplier_short": "Extrusion multiplier",
+        "label_origin_x_short": "Origin X",
+        "label_origin_y_short": "Origin Y",
+        "error_input_missing": "Input image does not exist: {path}",
+        "error_fan_speed": "Fan speed must be between 0 and 255.",
+    },
+    "ru": {
+        "app_title": "Negative To Relief",
+        "help_default_title": "Описание параметра",
+        "help_default_text": "Наведите курсор на параметр или перейдите в поле, чтобы увидеть краткое описание.",
+        "frame_files": "Файлы",
+        "frame_exports": "Экспорт",
+        "frame_processing": "Обработка изображения",
+        "frame_geometry": "Геометрия",
+        "frame_print": "Печать",
+        "frame_speed": "Скорости и температуры",
+        "frame_description": "Описание",
+        "frame_preview": "Превью карты высот",
+        "frame_log": "Журнал",
+        "label_input_image": "Исходное изображение",
+        "label_output_folder": "Папка вывода",
+        "label_language": "Язык",
+        "button_browse": "Выбрать",
+        "button_generate": "Сгенерировать",
+        "toggle_gcode": "G-code",
+        "toggle_obj": "OBJ mesh",
+        "toggle_stl": "STL mesh",
+        "toggle_invert": "Инвертировать изображение",
+        "toggle_autocontrast": "Автоконтраст",
+        "field_gamma": "Гамма",
+        "field_blur_radius": "Размытие",
+        "field_width_mm": "Ширина (мм)",
+        "field_depth_mm": "Глубина (мм)",
+        "field_relief_height": "Высота рельефа (мм)",
+        "field_base_thickness": "Толщина базы (мм)",
+        "field_resolution_x": "Разрешение X",
+        "field_resolution_y": "Разрешение Y",
+        "field_line_width": "Ширина линии (мм)",
+        "field_layer_height": "Высота слоя (мм)",
+        "field_filament_diameter": "Диаметр филамента (мм)",
+        "field_origin_x": "Смещение X (мм)",
+        "field_origin_y": "Смещение Y (мм)",
+        "field_extrusion_multiplier": "Множитель экструзии",
+        "field_print_speed": "Печать",
+        "field_first_layer_speed": "Первый слой",
+        "field_travel_speed": "Перемещения",
+        "field_z_speed": "Скорость Z",
+        "field_z_hop": "Подъем Z",
+        "field_nozzle_temperature": "Сопло C",
+        "field_bed_temperature": "Стол C",
+        "field_fan_speed": "Обдув 0-255",
+        "preview_placeholder": "Превью появится после генерации.",
+        "preview_saved_to": "Превью сохранено в:",
+        "dialog_input_title": "Выберите входное изображение",
+        "dialog_output_title": "Выберите папку вывода",
+        "filetype_images": "Изображения",
+        "filetype_all": "Все файлы",
+        "error_generation_failed": "Ошибка генерации",
+        "info_generation_completed": "Генерация завершена",
+        "status_heightmap_preview": "Превью карты высот: {path}",
+        "status_print_size": "Размер модели: {width:.2f} x {depth:.2f} x {height:.2f} мм",
+        "status_gcode": "G-code: {path}",
+        "status_layers": "Слоев: {layers}, сегментов: {segments}, филамента: {filament:.3f} м",
+        "status_obj": "OBJ mesh: {path}",
+        "status_stl": "STL mesh: {path}",
+        "status_mesh": "Сетка: {vertices} вершин, {triangles} треугольников",
+        "msg_heightmap_saved": "Карта высот сохранена в {path}",
+        "msg_gcode_saved": "G-code сохранен в {path}",
+        "msg_obj_saved": "OBJ сохранен в {path}",
+        "msg_stl_saved": "STL сохранен в {path}",
+        "label_width": "Ширина",
+        "label_relief_height_short": "Высота рельефа",
+        "label_base_thickness_short": "Толщина базы",
+        "label_gamma_short": "Гамма",
+        "label_blur_radius_short": "Размытие",
+        "label_line_width": "Ширина линии",
+        "label_layer_height_short": "Высота слоя",
+        "label_filament_diameter_short": "Диаметр филамента",
+        "label_print_speed_short": "Скорость печати",
+        "label_first_layer_speed_short": "Скорость первого слоя",
+        "label_travel_speed_short": "Скорость перемещений",
+        "label_z_speed_short": "Скорость Z",
+        "label_z_hop_short": "Подъем Z",
+        "label_extrusion_multiplier_short": "Множитель экструзии",
+        "label_origin_x_short": "Смещение X",
+        "label_origin_y_short": "Смещение Y",
+        "error_input_missing": "Исходное изображение не найдено: {path}",
+        "error_fan_speed": "Значение обдува должно быть в диапазоне от 0 до 255.",
+    },
+}
+GUI_FIELD_HELP: dict[str, dict[str, tuple[str, str]]] = {
+    "en": {
+        "input_image": (
+            "Input image",
+            "Source image that will be converted into a heightmap. By default the app expects a negative.",
+        ),
+        "output_folder": (
+            "Output folder",
+            "Directory where the app will save the preview PNG, G-code and optional OBJ or STL files.",
+        ),
+        "language": (
+            "Language",
+            "Switches the language of the GUI labels, hints and dialog messages.",
+        ),
+        "export_gcode": (
+            "G-code export",
+            "Creates layered G-code for an FDM printer based on the generated heightmap.",
+        ),
+        "export_obj": (
+            "OBJ export",
+            "Creates an OBJ mesh of the relief. Useful for 3D editors and mesh-based workflows.",
+        ),
+        "export_stl": (
+            "STL export",
+            "Creates an STL mesh of the relief. Useful for slicers and CAD or printing workflows.",
+        ),
+        "invert": (
+            "Invert source image",
+            "Turns a negative into a positive heightmap. Bright areas become taller after inversion.",
+        ),
+        "autocontrast": (
+            "Auto contrast",
+            "Stretches the tonal range of the image so the heightmap uses more of the available relief range.",
+        ),
+        "gamma": (
+            "Gamma",
+            "Adjusts how strongly midtones affect height. Lower values lift midtones, higher values compress them.",
+        ),
+        "blur_radius": (
+            "Blur radius",
+            "Applies Gaussian smoothing before building the heightmap. Useful for reducing noise and harsh steps.",
+        ),
+        "width_mm": ("Width (mm)", "Final physical size of the model along the X axis, in millimeters."),
+        "depth_mm": (
+            "Depth (mm)",
+            "Final physical size of the model along the Y axis, in millimeters. Leave empty to keep image proportions.",
+        ),
+        "relief_height": (
+            "Relief height (mm)",
+            "Maximum extra height of the relief above the base. Larger values produce stronger depth.",
+        ),
+        "base_thickness": (
+            "Base thickness (mm)",
+            "Thickness of the solid backing under the relief. This helps the print stay rigid and printable.",
+        ),
+        "resolution_x": (
+            "Resolution X",
+            "Number of sampling columns used to build the heightmap. Higher values add detail but also create heavier files.",
+        ),
+        "resolution_y": (
+            "Resolution Y",
+            "Number of sampling rows used to build the heightmap. Higher values increase detail and processing cost.",
+        ),
+        "line_width": (
+            "Line width (mm)",
+            "Extrusion width used for G-code generation. It should roughly match your slicer or nozzle setup.",
+        ),
+        "layer_height": (
+            "Layer height (mm)",
+            "Vertical step between printed layers. Smaller values improve detail but increase print time.",
+        ),
+        "filament_diameter": (
+            "Filament dia. (mm)",
+            "Diameter of the filament used for extrusion calculations. For most hobby printers this is 1.75 mm.",
+        ),
+        "origin_x": ("Origin X (mm)", "X position on the print bed where the generated G-code will place the model."),
+        "origin_y": ("Origin Y (mm)", "Y position on the print bed where the generated G-code will place the model."),
+        "extrusion_multiplier": (
+            "Extrusion multiplier",
+            "Scales the amount of material extruded. Increase slightly for under-extrusion, decrease for over-extrusion.",
+        ),
+        "print_speed": ("Print speed", "Main printing speed in millimeters per minute for regular layers."),
+        "first_layer_speed": (
+            "First layer",
+            "Printing speed of the first layer. Slower values usually improve bed adhesion.",
+        ),
+        "travel_speed": (
+            "Travel speed",
+            "Speed of non-printing moves. Higher values reduce travel time but can stress the machine.",
+        ),
+        "z_speed": ("Z speed", "Vertical movement speed on the Z axis, in millimeters per minute."),
+        "z_hop": (
+            "Z hop",
+            "Temporary lift before travel moves to reduce collisions with already printed areas.",
+        ),
+        "nozzle_temperature": (
+            "Nozzle C",
+            "Nozzle temperature in Celsius used in the generated G-code. Set to 0 to skip heating commands.",
+        ),
+        "bed_temperature": (
+            "Bed C",
+            "Bed temperature in Celsius used in the generated G-code. Set to 0 to skip heating commands.",
+        ),
+        "fan_speed": ("Fan 0-255", "Cooling fan PWM value used in G-code. 0 is off, 255 is maximum speed."),
+    },
+    "ru": {
+        "input_image": (
+            "Исходное изображение",
+            "Файл изображения, из которого строится карта высот. По умолчанию приложение считает, что это негатив.",
+        ),
+        "output_folder": (
+            "Папка вывода",
+            "Сюда будут сохранены превью PNG, G-code и при необходимости файлы OBJ или STL.",
+        ),
+        "language": (
+            "Язык",
+            "Переключает язык подписей интерфейса, подсказок и сообщений диалоговых окон.",
+        ),
+        "export_gcode": (
+            "Экспорт G-code",
+            "Создает послойный G-code для FDM-принтера по построенной карте высот.",
+        ),
+        "export_obj": (
+            "Экспорт OBJ",
+            "Создает OBJ-модель рельефа. Полезно для 3D-редакторов и работы с мешами.",
+        ),
+        "export_stl": (
+            "Экспорт STL",
+            "Создает STL-модель рельефа. Удобно для слайсеров и подготовки к печати.",
+        ),
+        "invert": (
+            "Инвертировать изображение",
+            "Преобразует негатив в позитивную карту высот. Светлые области после инверсии становятся выше.",
+        ),
+        "autocontrast": (
+            "Автоконтраст",
+            "Растягивает тональный диапазон изображения, чтобы рельеф использовал больше доступной высоты.",
+        ),
+        "gamma": (
+            "Гамма",
+            "Меняет влияние средних тонов на высоту. Меньшие значения поднимают полутона, большие делают их слабее.",
+        ),
+        "blur_radius": (
+            "Размытие",
+            "Добавляет гауссово сглаживание перед построением карты высот. Полезно для уменьшения шума.",
+        ),
+        "width_mm": ("Ширина (мм)", "Физический размер модели по оси X в миллиметрах."),
+        "depth_mm": (
+            "Глубина (мм)",
+            "Физический размер модели по оси Y в миллиметрах. Если оставить пустым, пропорции изображения сохранятся автоматически.",
+        ),
+        "relief_height": (
+            "Высота рельефа (мм)",
+            "Максимальная дополнительная высота рельефа над базой. Чем больше значение, тем глубже эффект.",
+        ),
+        "base_thickness": (
+            "Толщина базы (мм)",
+            "Толщина сплошной подложки под рельефом. Делает модель более жесткой и удобной для печати.",
+        ),
+        "resolution_x": (
+            "Разрешение X",
+            "Количество столбцов выборки при построении карты высот. Больше значение — выше детализация и тяжелее файлы.",
+        ),
+        "resolution_y": (
+            "Разрешение Y",
+            "Количество строк выборки при построении карты высот. Больше значение — выше детализация и больше нагрузка.",
+        ),
+        "line_width": (
+            "Ширина линии (мм)",
+            "Ширина экструзии для генерации G-code. Обычно должна соответствовать настройкам сопла и печати.",
+        ),
+        "layer_height": (
+            "Высота слоя (мм)",
+            "Вертикальный шаг между слоями. Меньшие значения улучшают детализацию, но увеличивают время печати.",
+        ),
+        "filament_diameter": (
+            "Диаметр филамента (мм)",
+            "Диаметр прутка, используемый в расчете экструзии. Для большинства принтеров это 1.75 мм.",
+        ),
+        "origin_x": ("Смещение X (мм)", "Положение модели по оси X на столе в сгенерированном G-code."),
+        "origin_y": ("Смещение Y (мм)", "Положение модели по оси Y на столе в сгенерированном G-code."),
+        "extrusion_multiplier": (
+            "Множитель экструзии",
+            "Масштабирует количество подаваемого материала. Полезно для тонкой коррекции недо- или переэкструзии.",
+        ),
+        "print_speed": ("Скорость печати", "Основная скорость печати обычных слоев в миллиметрах в минуту."),
+        "first_layer_speed": (
+            "Первый слой",
+            "Скорость печати первого слоя. Более низкие значения обычно улучшают прилипание к столу.",
+        ),
+        "travel_speed": (
+            "Скорость перемещений",
+            "Скорость холостых перемещений без печати. Большие значения сокращают время, но сильнее нагружают механику.",
+        ),
+        "z_speed": ("Скорость Z", "Скорость движения по оси Z в миллиметрах в минуту."),
+        "z_hop": (
+            "Подъем Z",
+            "Временный подъем сопла перед перемещением, чтобы уменьшить риск задевания уже напечатанных участков.",
+        ),
+        "nozzle_temperature": (
+            "Сопло C",
+            "Температура сопла в градусах Цельсия для G-code. Установите 0, чтобы не добавлять команды нагрева.",
+        ),
+        "bed_temperature": (
+            "Стол C",
+            "Температура стола в градусах Цельсия для G-code. Установите 0, чтобы не добавлять команды нагрева.",
+        ),
+        "fan_speed": ("Обдув 0-255", "Мощность вентилятора в G-code. 0 — выключено, 255 — максимум."),
+    },
+}
 
 
 @dataclass(frozen=True)
@@ -163,6 +543,16 @@ def required_non_negative_float(value: str, label: str) -> float:
     if parsed < 0:
         raise ValueError(f"{label} must be zero or greater.")
     return parsed
+
+
+def default_gui_language() -> str:
+    try:
+        locale_name = locale.getlocale()[0]
+    except (ValueError, IndexError, TypeError):
+        locale_name = None
+    if locale_name and locale_name.lower().startswith("ru"):
+        return "ru"
+    return "en"
 
 
 def load_runtime_dependencies() -> tuple[object, object, object, object]:
@@ -934,11 +1324,13 @@ def launch_gui(initial_input: Path | None = None) -> None:
     class ReliefApp:
         def __init__(self, root: tk.Tk, preset_input: Path | None) -> None:
             self.root = root
-            self.root.title("Negative To Relief")
+            self.current_language = default_gui_language()
+            self.root.title(GUI_TRANSLATIONS[self.current_language]["app_title"])
             self.root.geometry("920x760")
             self.root.minsize(820, 640)
 
             self.input_path_var = tk.StringVar(value=str(preset_input) if preset_input else "")
+            self.language_var = tk.StringVar(value=GUI_LANGUAGE_NAMES[self.current_language])
             default_output_dir = str(preset_input.parent) if preset_input else str(Path.cwd())
             self.output_dir_var = tk.StringVar(value=default_output_dir)
             self.export_gcode_var = tk.BooleanVar(value=True)
@@ -968,12 +1360,17 @@ def launch_gui(initial_input: Path | None = None) -> None:
             self.fan_speed_var = tk.StringVar(value=str(DEFAULT_FAN_SPEED))
             self.autocontrast_var = tk.BooleanVar(value=False)
             self.invert_var = tk.BooleanVar(value=True)
+            self.help_title_var = tk.StringVar(value="")
+            self.help_body_var = tk.StringVar(value="")
+            self.current_help_key: str | None = None
+            self.translatable_widgets: list[tuple[object, str, str]] = []
 
             self.status_text = tk.Text(root, height=14, wrap="word", state="disabled")
             self.preview_label: ttk.Label | None = None
             self.preview_image = None
 
             self.build_layout(ttk, filedialog, messagebox)
+            self.apply_language()
 
         def build_layout(self, ttk_module, filedialog_module, messagebox_module) -> None:
             container = ttk_module.Frame(self.root, padding=14)
@@ -981,150 +1378,338 @@ def launch_gui(initial_input: Path | None = None) -> None:
             container.columnconfigure(0, weight=1)
             container.rowconfigure(0, weight=1)
             container.rowconfigure(1, weight=0)
+            container.rowconfigure(2, weight=0)
 
             canvas = tk.Canvas(container, highlightthickness=0)
-            scrollbar = ttk_module.Scrollbar(container, orient="vertical", command=canvas.yview)
+            v_scrollbar = ttk_module.Scrollbar(container, orient="vertical", command=canvas.yview)
+            h_scrollbar = ttk_module.Scrollbar(container, orient="horizontal", command=canvas.xview)
             content = ttk_module.Frame(canvas, padding=(0, 0, 6, 0))
             content.bind(
                 "<Configure>",
                 lambda event: canvas.configure(scrollregion=canvas.bbox("all")),
             )
             canvas.create_window((0, 0), window=content, anchor="nw")
-            canvas.configure(yscrollcommand=scrollbar.set)
+            canvas.configure(yscrollcommand=v_scrollbar.set, xscrollcommand=h_scrollbar.set)
             canvas.grid(row=0, column=0, sticky="nsew")
-            scrollbar.grid(row=0, column=1, sticky="ns")
+            v_scrollbar.grid(row=0, column=1, sticky="ns")
+            h_scrollbar.grid(row=1, column=0, sticky="ew")
             content.columnconfigure(0, weight=1)
             content.columnconfigure(1, weight=1)
+            content.columnconfigure(2, weight=0)
 
-            files_frame = ttk_module.LabelFrame(content, text="Files", padding=12)
+            files_frame = ttk_module.LabelFrame(content, text="", padding=12)
             files_frame.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 10))
             files_frame.columnconfigure(1, weight=1)
+            self.register_translatable(files_frame, "frame_files")
 
-            ttk_module.Label(files_frame, text="Input image").grid(row=0, column=0, sticky="w", padx=(0, 8))
-            ttk_module.Entry(files_frame, textvariable=self.input_path_var).grid(
-                row=0, column=1, sticky="ew"
-            )
-            ttk_module.Button(
+            input_label = ttk_module.Label(files_frame, text="")
+            input_label.grid(row=0, column=0, sticky="w", padx=(0, 8))
+            input_entry = ttk_module.Entry(files_frame, textvariable=self.input_path_var)
+            input_entry.grid(row=0, column=1, sticky="ew")
+            input_button = ttk_module.Button(
                 files_frame,
-                text="Browse",
+                text="",
                 command=lambda: self.pick_input_file(filedialog_module),
-            ).grid(row=0, column=2, padx=(8, 0))
+            )
+            input_button.grid(row=0, column=2, padx=(8, 0))
+            self.register_translatable(input_label, "label_input_image")
+            self.register_translatable(input_button, "button_browse")
+            self.register_help(input_label, "input_image")
+            self.register_help(input_entry, "input_image")
+            self.register_help(input_button, "input_image")
 
-            ttk_module.Label(files_frame, text="Output folder").grid(
-                row=1, column=0, sticky="w", padx=(0, 8), pady=(8, 0)
-            )
-            ttk_module.Entry(files_frame, textvariable=self.output_dir_var).grid(
-                row=1, column=1, sticky="ew", pady=(8, 0)
-            )
-            ttk_module.Button(
+            output_label = ttk_module.Label(files_frame, text="")
+            output_label.grid(row=1, column=0, sticky="w", padx=(0, 8), pady=(8, 0))
+            output_entry = ttk_module.Entry(files_frame, textvariable=self.output_dir_var)
+            output_entry.grid(row=1, column=1, sticky="ew", pady=(8, 0))
+            output_button = ttk_module.Button(
                 files_frame,
-                text="Browse",
+                text="",
                 command=lambda: self.pick_output_dir(filedialog_module),
-            ).grid(row=1, column=2, padx=(8, 0), pady=(8, 0))
+            )
+            output_button.grid(row=1, column=2, padx=(8, 0), pady=(8, 0))
+            self.register_translatable(output_label, "label_output_folder")
+            self.register_translatable(output_button, "button_browse")
+            self.register_help(output_label, "output_folder")
+            self.register_help(output_entry, "output_folder")
+            self.register_help(output_button, "output_folder")
 
-            outputs_frame = ttk_module.LabelFrame(content, text="Exports", padding=12)
+            language_label = ttk_module.Label(files_frame, text="")
+            language_label.grid(row=2, column=0, sticky="w", padx=(0, 8), pady=(8, 0))
+            language_box = ttk_module.Combobox(
+                files_frame,
+                textvariable=self.language_var,
+                state="readonly",
+                values=[GUI_LANGUAGE_NAMES["en"], GUI_LANGUAGE_NAMES["ru"]],
+                width=18,
+            )
+            language_box.grid(row=2, column=1, sticky="w", pady=(8, 0))
+            language_box.bind("<<ComboboxSelected>>", self.on_language_change, add="+")
+            self.register_translatable(language_label, "label_language")
+            self.register_help(language_label, "language")
+            self.register_help(language_box, "language")
+
+            outputs_frame = ttk_module.LabelFrame(content, text="", padding=12)
             outputs_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 6), pady=(0, 10))
-            ttk_module.Checkbutton(outputs_frame, text="G-code", variable=self.export_gcode_var).grid(
-                row=0, column=0, sticky="w"
-            )
-            ttk_module.Checkbutton(outputs_frame, text="OBJ mesh", variable=self.export_obj_var).grid(
-                row=1, column=0, sticky="w"
-            )
-            ttk_module.Checkbutton(outputs_frame, text="STL mesh", variable=self.export_stl_var).grid(
-                row=2, column=0, sticky="w"
-            )
+            self.register_translatable(outputs_frame, "frame_exports")
+            export_gcode = ttk_module.Checkbutton(outputs_frame, text="", variable=self.export_gcode_var)
+            export_gcode.grid(row=0, column=0, sticky="w")
+            export_obj = ttk_module.Checkbutton(outputs_frame, text="", variable=self.export_obj_var)
+            export_obj.grid(row=1, column=0, sticky="w")
+            export_stl = ttk_module.Checkbutton(outputs_frame, text="", variable=self.export_stl_var)
+            export_stl.grid(row=2, column=0, sticky="w")
+            self.register_translatable(export_gcode, "toggle_gcode")
+            self.register_translatable(export_obj, "toggle_obj")
+            self.register_translatable(export_stl, "toggle_stl")
+            self.register_help(export_gcode, "export_gcode")
+            self.register_help(export_obj, "export_obj")
+            self.register_help(export_stl, "export_stl")
 
-            tone_frame = ttk_module.LabelFrame(content, text="Image Processing", padding=12)
+            tone_frame = ttk_module.LabelFrame(content, text="", padding=12)
             tone_frame.grid(row=1, column=1, sticky="nsew", padx=(6, 0), pady=(0, 10))
-            ttk_module.Checkbutton(
-                tone_frame, text="Invert source image", variable=self.invert_var
-            ).grid(row=0, column=0, sticky="w")
-            ttk_module.Checkbutton(
-                tone_frame, text="Auto contrast", variable=self.autocontrast_var
-            ).grid(row=1, column=0, sticky="w")
-            self.add_labeled_entry(ttk_module, tone_frame, "Gamma", self.gamma_var, 2)
-            self.add_labeled_entry(ttk_module, tone_frame, "Blur radius", self.blur_radius_var, 3)
+            self.register_translatable(tone_frame, "frame_processing")
+            invert_toggle = ttk_module.Checkbutton(
+                tone_frame, text="", variable=self.invert_var
+            )
+            invert_toggle.grid(row=0, column=0, sticky="w")
+            autocontrast_toggle = ttk_module.Checkbutton(
+                tone_frame, text="", variable=self.autocontrast_var
+            )
+            autocontrast_toggle.grid(row=1, column=0, sticky="w")
+            self.register_translatable(invert_toggle, "toggle_invert")
+            self.register_translatable(autocontrast_toggle, "toggle_autocontrast")
+            self.register_help(invert_toggle, "invert")
+            self.register_help(autocontrast_toggle, "autocontrast")
+            self.add_labeled_entry(ttk_module, tone_frame, "field_gamma", self.gamma_var, 2, "gamma")
+            self.add_labeled_entry(
+                ttk_module, tone_frame, "field_blur_radius", self.blur_radius_var, 3, "blur_radius"
+            )
 
-            geometry_frame = ttk_module.LabelFrame(content, text="Geometry", padding=12)
+            geometry_frame = ttk_module.LabelFrame(content, text="", padding=12)
             geometry_frame.grid(row=2, column=0, sticky="nsew", padx=(0, 6), pady=(0, 10))
             geometry_frame.columnconfigure(1, weight=1)
-            self.add_labeled_entry(ttk_module, geometry_frame, "Width (mm)", self.width_mm_var, 0)
-            self.add_labeled_entry(ttk_module, geometry_frame, "Depth (mm)", self.depth_mm_var, 1)
+            self.register_translatable(geometry_frame, "frame_geometry")
             self.add_labeled_entry(
-                ttk_module, geometry_frame, "Relief height (mm)", self.relief_height_var, 2
+                ttk_module, geometry_frame, "field_width_mm", self.width_mm_var, 0, "width_mm"
             )
             self.add_labeled_entry(
-                ttk_module, geometry_frame, "Base thickness (mm)", self.base_thickness_var, 3
+                ttk_module, geometry_frame, "field_depth_mm", self.depth_mm_var, 1, "depth_mm"
             )
-            self.add_labeled_entry(ttk_module, geometry_frame, "Resolution X", self.resolution_x_var, 4)
-            self.add_labeled_entry(ttk_module, geometry_frame, "Resolution Y", self.resolution_y_var, 5)
+            self.add_labeled_entry(
+                ttk_module,
+                geometry_frame,
+                "field_relief_height",
+                self.relief_height_var,
+                2,
+                "relief_height",
+            )
+            self.add_labeled_entry(
+                ttk_module,
+                geometry_frame,
+                "field_base_thickness",
+                self.base_thickness_var,
+                3,
+                "base_thickness",
+            )
+            self.add_labeled_entry(
+                ttk_module, geometry_frame, "field_resolution_x", self.resolution_x_var, 4, "resolution_x"
+            )
+            self.add_labeled_entry(
+                ttk_module, geometry_frame, "field_resolution_y", self.resolution_y_var, 5, "resolution_y"
+            )
 
-            print_frame = ttk_module.LabelFrame(content, text="Print", padding=12)
+            print_frame = ttk_module.LabelFrame(content, text="", padding=12)
             print_frame.grid(row=2, column=1, sticky="nsew", padx=(6, 0), pady=(0, 10))
             print_frame.columnconfigure(1, weight=1)
-            self.add_labeled_entry(ttk_module, print_frame, "Line width (mm)", self.line_width_var, 0)
-            self.add_labeled_entry(ttk_module, print_frame, "Layer height (mm)", self.layer_height_var, 1)
+            self.register_translatable(print_frame, "frame_print")
             self.add_labeled_entry(
-                ttk_module, print_frame, "Filament dia. (mm)", self.filament_diameter_var, 2
+                ttk_module, print_frame, "field_line_width", self.line_width_var, 0, "line_width"
             )
-            self.add_labeled_entry(ttk_module, print_frame, "Origin X (mm)", self.origin_x_var, 3)
-            self.add_labeled_entry(ttk_module, print_frame, "Origin Y (mm)", self.origin_y_var, 4)
             self.add_labeled_entry(
-                ttk_module, print_frame, "Extrusion multiplier", self.extrusion_multiplier_var, 5
+                ttk_module, print_frame, "field_layer_height", self.layer_height_var, 1, "layer_height"
+            )
+            self.add_labeled_entry(
+                ttk_module,
+                print_frame,
+                "field_filament_diameter",
+                self.filament_diameter_var,
+                2,
+                "filament_diameter",
+            )
+            self.add_labeled_entry(
+                ttk_module, print_frame, "field_origin_x", self.origin_x_var, 3, "origin_x"
+            )
+            self.add_labeled_entry(
+                ttk_module, print_frame, "field_origin_y", self.origin_y_var, 4, "origin_y"
+            )
+            self.add_labeled_entry(
+                ttk_module,
+                print_frame,
+                "field_extrusion_multiplier",
+                self.extrusion_multiplier_var,
+                5,
+                "extrusion_multiplier",
             )
 
-            speeds_frame = ttk_module.LabelFrame(content, text="Speed And Temperatures", padding=12)
+            speeds_frame = ttk_module.LabelFrame(content, text="", padding=12)
             speeds_frame.grid(row=3, column=0, columnspan=2, sticky="ew", pady=(0, 10))
+            self.register_translatable(speeds_frame, "frame_speed")
             for col_index in (1, 3, 5):
                 speeds_frame.columnconfigure(col_index, weight=1)
-            self.add_grid_entry(ttk_module, speeds_frame, "Print", self.print_speed_var, 0, 0)
+            self.add_grid_entry(ttk_module, speeds_frame, "field_print_speed", self.print_speed_var, 0, 0, "print_speed")
             self.add_grid_entry(
-                ttk_module, speeds_frame, "First layer", self.first_layer_speed_var, 0, 2
+                ttk_module,
+                speeds_frame,
+                "field_first_layer_speed",
+                self.first_layer_speed_var,
+                0,
+                2,
+                "first_layer_speed",
             )
-            self.add_grid_entry(ttk_module, speeds_frame, "Travel", self.travel_speed_var, 0, 4)
-            self.add_grid_entry(ttk_module, speeds_frame, "Z speed", self.z_speed_var, 1, 0)
-            self.add_grid_entry(ttk_module, speeds_frame, "Z hop", self.z_hop_var, 1, 2)
             self.add_grid_entry(
-                ttk_module, speeds_frame, "Nozzle C", self.nozzle_temperature_var, 1, 4
+                ttk_module, speeds_frame, "field_travel_speed", self.travel_speed_var, 0, 4, "travel_speed"
             )
-            self.add_grid_entry(ttk_module, speeds_frame, "Bed C", self.bed_temperature_var, 2, 0)
-            self.add_grid_entry(ttk_module, speeds_frame, "Fan 0-255", self.fan_speed_var, 2, 2)
+            self.add_grid_entry(ttk_module, speeds_frame, "field_z_speed", self.z_speed_var, 1, 0, "z_speed")
+            self.add_grid_entry(ttk_module, speeds_frame, "field_z_hop", self.z_hop_var, 1, 2, "z_hop")
+            self.add_grid_entry(
+                ttk_module,
+                speeds_frame,
+                "field_nozzle_temperature",
+                self.nozzle_temperature_var,
+                1,
+                4,
+                "nozzle_temperature",
+            )
+            self.add_grid_entry(
+                ttk_module, speeds_frame, "field_bed_temperature", self.bed_temperature_var, 2, 0, "bed_temperature"
+            )
+            self.add_grid_entry(
+                ttk_module, speeds_frame, "field_fan_speed", self.fan_speed_var, 2, 2, "fan_speed"
+            )
 
-            preview_frame = ttk_module.LabelFrame(content, text="Heightmap Preview", padding=12)
+            help_frame = ttk_module.LabelFrame(content, text="", padding=12)
+            help_frame.grid(row=0, column=2, rowspan=5, sticky="nsew", padx=(12, 0), pady=(0, 10))
+            help_frame.columnconfigure(0, weight=1)
+            self.register_translatable(help_frame, "frame_description")
+            help_title_label = ttk_module.Label(
+                help_frame,
+                textvariable=self.help_title_var,
+                font=("TkDefaultFont", 11, "bold"),
+                anchor="w",
+                justify="left",
+            )
+            help_title_label.grid(row=0, column=0, sticky="ew")
+            help_body_label = ttk_module.Label(
+                help_frame,
+                textvariable=self.help_body_var,
+                wraplength=260,
+                anchor="nw",
+                justify="left",
+            )
+            help_body_label.grid(row=1, column=0, sticky="nsew", pady=(8, 0))
+
+            preview_frame = ttk_module.LabelFrame(content, text="", padding=12)
             preview_frame.grid(row=4, column=0, sticky="nsew", padx=(0, 6), pady=(0, 10))
-            self.preview_label = ttk_module.Label(preview_frame, text="Preview appears after generation.")
+            self.register_translatable(preview_frame, "frame_preview")
+            self.preview_label = ttk_module.Label(preview_frame, text="")
             self.preview_label.pack(fill="both", expand=True)
+            self.register_translatable(self.preview_label, "preview_placeholder")
 
-            log_frame = ttk_module.LabelFrame(content, text="Log", padding=12)
+            log_frame = ttk_module.LabelFrame(content, text="", padding=12)
             log_frame.grid(row=4, column=1, sticky="nsew", padx=(6, 0), pady=(0, 10))
+            self.register_translatable(log_frame, "frame_log")
             self.status_text.pack(in_=log_frame, fill="both", expand=True)
 
             actions = ttk_module.Frame(container)
-            actions.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(10, 0))
+            actions.grid(row=2, column=0, columnspan=2, sticky="ew", pady=(10, 0))
             actions.columnconfigure(0, weight=1)
-            ttk_module.Button(
+            generate_button = ttk_module.Button(
                 actions,
-                text="Generate",
+                text="",
                 command=lambda: self.generate(messagebox_module),
-            ).grid(row=0, column=0, sticky="e")
+            )
+            generate_button.grid(row=0, column=0, sticky="e")
+            self.register_translatable(generate_button, "button_generate")
 
-        def add_labeled_entry(self, ttk_module, parent, label: str, variable: tk.StringVar, row: int) -> None:
-            ttk_module.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
-            ttk_module.Entry(parent, textvariable=variable).grid(row=row, column=1, sticky="ew", pady=4)
+        def tr(self, key: str, **kwargs) -> str:
+            text = GUI_TRANSLATIONS[self.current_language].get(key, key)
+            if kwargs:
+                return text.format(**kwargs)
+            return text
+
+        def register_translatable(self, widget, key: str, option: str = "text") -> None:
+            self.translatable_widgets.append((widget, option, key))
+
+        def apply_language(self) -> None:
+            self.root.title(self.tr("app_title"))
+            for widget, option, key in self.translatable_widgets:
+                widget.configure(**{option: self.tr(key)})
+            if self.preview_label is not None:
+                if self.preview_image is None:
+                    self.preview_label.configure(text=self.tr("preview_placeholder"))
+                else:
+                    self.preview_label.configure(text="")
+            if self.current_help_key is None:
+                self.help_title_var.set(self.tr("help_default_title"))
+                self.help_body_var.set(self.tr("help_default_text"))
+            else:
+                self.set_help(self.current_help_key)
+
+        def on_language_change(self, _event=None) -> None:
+            selected_name = self.language_var.get()
+            for code, display_name in GUI_LANGUAGE_NAMES.items():
+                if display_name == selected_name:
+                    self.current_language = code
+                    break
+            self.apply_language()
+
+        def set_help(self, help_key: str) -> None:
+            self.current_help_key = help_key
+            title, body = GUI_FIELD_HELP[self.current_language].get(
+                help_key,
+                (self.tr("help_default_title"), self.tr("help_default_text")),
+            )
+            self.help_title_var.set(title)
+            self.help_body_var.set(body)
+
+        def register_help(self, widget, help_key: str) -> None:
+            widget.bind("<Enter>", lambda event, key=help_key: self.set_help(key), add="+")
+            widget.bind("<FocusIn>", lambda event, key=help_key: self.set_help(key), add="+")
+
+        def add_labeled_entry(
+            self,
+            ttk_module,
+            parent,
+            label_key: str,
+            variable: tk.StringVar,
+            row: int,
+            help_key: str,
+        ) -> None:
+            label_widget = ttk_module.Label(parent, text="")
+            label_widget.grid(row=row, column=0, sticky="w", padx=(0, 8), pady=4)
+            entry_widget = ttk_module.Entry(parent, textvariable=variable)
+            entry_widget.grid(row=row, column=1, sticky="ew", pady=4)
+            self.register_translatable(label_widget, label_key)
+            self.register_help(label_widget, help_key)
+            self.register_help(entry_widget, help_key)
 
         def add_grid_entry(
             self,
             ttk_module,
             parent,
-            label: str,
+            label_key: str,
             variable: tk.StringVar,
             row: int,
             column: int,
+            help_key: str,
         ) -> None:
-            ttk_module.Label(parent, text=label).grid(row=row, column=column, sticky="w", padx=(0, 6), pady=4)
-            ttk_module.Entry(parent, textvariable=variable, width=12).grid(
-                row=row, column=column + 1, sticky="ew", padx=(0, 12), pady=4
-            )
+            label_widget = ttk_module.Label(parent, text="")
+            label_widget.grid(row=row, column=column, sticky="w", padx=(0, 6), pady=4)
+            entry_widget = ttk_module.Entry(parent, textvariable=variable, width=12)
+            entry_widget.grid(row=row, column=column + 1, sticky="ew", padx=(0, 12), pady=4)
+            self.register_translatable(label_widget, label_key)
+            self.register_help(label_widget, help_key)
+            self.register_help(entry_widget, help_key)
 
         def append_status(self, message: str) -> None:
             self.status_text.configure(state="normal")
@@ -1139,10 +1724,10 @@ def launch_gui(initial_input: Path | None = None) -> None:
 
         def pick_input_file(self, filedialog_module) -> None:
             path = filedialog_module.askopenfilename(
-                title="Choose an input image",
+                title=self.tr("dialog_input_title"),
                 filetypes=[
-                    ("Images", "*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp"),
-                    ("All files", "*.*"),
+                    (self.tr("filetype_images"), "*.png *.jpg *.jpeg *.bmp *.tif *.tiff *.webp"),
+                    (self.tr("filetype_all"), "*.*"),
                 ],
             )
             if path:
@@ -1150,14 +1735,14 @@ def launch_gui(initial_input: Path | None = None) -> None:
                 self.output_dir_var.set(str(Path(path).resolve().parent))
 
         def pick_output_dir(self, filedialog_module) -> None:
-            path = filedialog_module.askdirectory(title="Choose output folder")
+            path = filedialog_module.askdirectory(title=self.tr("dialog_output_title"))
             if path:
                 self.output_dir_var.set(path)
 
         def build_settings(self) -> tuple[HeightmapSettings, PrintSettings, Path, Path | None, Path | None, Path | None]:
             input_path = Path(self.input_path_var.get()).expanduser().resolve()
             if not input_path.exists():
-                raise ValueError(f"Input image does not exist: {input_path}")
+                raise ValueError(self.tr("error_input_missing", path=input_path))
 
             output_dir = Path(self.output_dir_var.get()).expanduser().resolve()
             output_dir.mkdir(parents=True, exist_ok=True)
@@ -1170,46 +1755,52 @@ def launch_gui(initial_input: Path | None = None) -> None:
 
             heightmap_settings = HeightmapSettings(
                 input_path=input_path,
-                width_mm=required_positive_float(self.width_mm_var.get(), "Width"),
+                width_mm=required_positive_float(self.width_mm_var.get(), self.tr("label_width")),
                 depth_mm=optional_positive_float(self.depth_mm_var.get()),
                 relief_height_mm=required_positive_float(
-                    self.relief_height_var.get(), "Relief height"
+                    self.relief_height_var.get(), self.tr("label_relief_height_short")
                 ),
                 base_thickness_mm=required_non_negative_float(
-                    self.base_thickness_var.get(), "Base thickness"
+                    self.base_thickness_var.get(), self.tr("label_base_thickness_short")
                 ),
                 invert=self.invert_var.get(),
                 autocontrast=self.autocontrast_var.get(),
-                gamma=required_positive_float(self.gamma_var.get(), "Gamma"),
-                blur_radius=required_non_negative_float(self.blur_radius_var.get(), "Blur radius"),
+                gamma=required_positive_float(self.gamma_var.get(), self.tr("label_gamma_short")),
+                blur_radius=required_non_negative_float(
+                    self.blur_radius_var.get(), self.tr("label_blur_radius_short")
+                ),
                 resolution_x=optional_positive_int(self.resolution_x_var.get()),
                 resolution_y=optional_positive_int(self.resolution_y_var.get()),
             )
 
             fan_speed = int(self.fan_speed_var.get())
             if not 0 <= fan_speed <= 255:
-                raise ValueError("Fan speed must be between 0 and 255.")
+                raise ValueError(self.tr("error_fan_speed"))
 
             print_settings = PrintSettings(
-                line_width_mm=required_positive_float(self.line_width_var.get(), "Line width"),
-                layer_height_mm=required_positive_float(self.layer_height_var.get(), "Layer height"),
-                filament_diameter_mm=required_positive_float(
-                    self.filament_diameter_var.get(), "Filament diameter"
+                line_width_mm=required_positive_float(self.line_width_var.get(), self.tr("label_line_width")),
+                layer_height_mm=required_positive_float(
+                    self.layer_height_var.get(), self.tr("label_layer_height_short")
                 ),
-                print_speed_mmpm=required_positive_float(self.print_speed_var.get(), "Print speed"),
+                filament_diameter_mm=required_positive_float(
+                    self.filament_diameter_var.get(), self.tr("label_filament_diameter_short")
+                ),
+                print_speed_mmpm=required_positive_float(
+                    self.print_speed_var.get(), self.tr("label_print_speed_short")
+                ),
                 first_layer_speed_mmpm=required_positive_float(
-                    self.first_layer_speed_var.get(), "First layer speed"
+                    self.first_layer_speed_var.get(), self.tr("label_first_layer_speed_short")
                 ),
                 travel_speed_mmpm=required_positive_float(
-                    self.travel_speed_var.get(), "Travel speed"
+                    self.travel_speed_var.get(), self.tr("label_travel_speed_short")
                 ),
-                z_speed_mmpm=required_positive_float(self.z_speed_var.get(), "Z speed"),
-                z_hop_mm=required_non_negative_float(self.z_hop_var.get(), "Z hop"),
+                z_speed_mmpm=required_positive_float(self.z_speed_var.get(), self.tr("label_z_speed_short")),
+                z_hop_mm=required_non_negative_float(self.z_hop_var.get(), self.tr("label_z_hop_short")),
                 extrusion_multiplier=required_positive_float(
-                    self.extrusion_multiplier_var.get(), "Extrusion multiplier"
+                    self.extrusion_multiplier_var.get(), self.tr("label_extrusion_multiplier_short")
                 ),
-                origin_x_mm=required_non_negative_float(self.origin_x_var.get(), "Origin X"),
-                origin_y_mm=required_non_negative_float(self.origin_y_var.get(), "Origin Y"),
+                origin_x_mm=required_non_negative_float(self.origin_x_var.get(), self.tr("label_origin_x_short")),
+                origin_y_mm=required_non_negative_float(self.origin_y_var.get(), self.tr("label_origin_y_short")),
                 nozzle_temperature_c=normalize_temperature(int(self.nozzle_temperature_var.get())),
                 bed_temperature_c=normalize_temperature(int(self.bed_temperature_var.get())),
                 fan_speed=fan_speed,
@@ -1227,7 +1818,7 @@ def launch_gui(initial_input: Path | None = None) -> None:
                 from PIL import ImageTk
             except ImportError:
                 preview_image.close()
-                self.preview_label.configure(text=f"Preview saved to:\n{heightmap_path}")
+                self.preview_label.configure(text=f"{self.tr('preview_saved_to')}\n{heightmap_path}")
                 return
             self.preview_image = ImageTk.PhotoImage(preview_image)
             self.preview_label.configure(image=self.preview_image, text="")
@@ -1240,40 +1831,52 @@ def launch_gui(initial_input: Path | None = None) -> None:
                 summary = generate_outputs(*settings)
             except Exception as exc:
                 self.append_status(str(exc))
-                messagebox_module.showerror("Generation failed", str(exc))
+                messagebox_module.showerror(self.tr("error_generation_failed"), str(exc))
                 return
 
             self.update_preview(summary.heightmap_path)
-            self.append_status(f"Heightmap preview: {summary.heightmap_path}")
+            self.append_status(self.tr("status_heightmap_preview", path=summary.heightmap_path))
             self.append_status(
-                "Print size: "
-                f"{summary.heightmap.width_mm:.2f} x {summary.heightmap.depth_mm:.2f} x "
-                f"{summary.heightmap.total_height_mm:.2f} mm"
+                self.tr(
+                    "status_print_size",
+                    width=summary.heightmap.width_mm,
+                    depth=summary.heightmap.depth_mm,
+                    height=summary.heightmap.total_height_mm,
+                )
             )
             if summary.gcode_path is not None and summary.gcode_stats is not None:
-                self.append_status(f"G-code: {summary.gcode_path}")
                 self.append_status(
-                    f"Layers: {summary.gcode_stats.layer_count}, "
-                    f"segments: {summary.gcode_stats.print_segments}, "
-                    f"filament: {summary.gcode_stats.filament_mm / 1000:.3f} m"
+                    self.tr("status_gcode", path=summary.gcode_path)
+                )
+                self.append_status(
+                    self.tr(
+                        "status_layers",
+                        layers=summary.gcode_stats.layer_count,
+                        segments=summary.gcode_stats.print_segments,
+                        filament=summary.gcode_stats.filament_mm / 1000,
+                    )
                 )
             if summary.obj_path is not None:
-                self.append_status(f"OBJ mesh: {summary.obj_path}")
+                self.append_status(self.tr("status_obj", path=summary.obj_path))
             if summary.stl_path is not None:
-                self.append_status(f"STL mesh: {summary.stl_path}")
+                self.append_status(self.tr("status_stl", path=summary.stl_path))
             if summary.mesh_vertices is not None and summary.mesh_faces is not None:
                 self.append_status(
-                    f"Mesh: {summary.mesh_vertices} vertices, {summary.mesh_faces} triangles"
+                    self.tr(
+                        "status_mesh",
+                        vertices=summary.mesh_vertices,
+                        triangles=summary.mesh_faces,
+                    )
                 )
 
-            message_lines = [f"Heightmap saved to {summary.heightmap_path}"]
+            message_lines = [self.tr("msg_heightmap_saved", path=summary.heightmap_path)]
             if summary.gcode_path is not None:
-                message_lines.append(f"G-code saved to {summary.gcode_path}")
+                message_lines.append(self.tr("msg_gcode_saved", path=summary.gcode_path))
             if summary.obj_path is not None:
-                message_lines.append(f"OBJ saved to {summary.obj_path}")
+                message_lines.append(self.tr("msg_obj_saved", path=summary.obj_path))
             if summary.stl_path is not None:
-                message_lines.append(f"STL saved to {summary.stl_path}")
-            messagebox_module.showinfo("Generation completed", "\n".join(message_lines))
+                message_lines.append(self.tr("msg_stl_saved", path=summary.stl_path))
+            messagebox_module.showinfo(self.tr("info_generation_completed"), "\n".join(message_lines))
 
     try:
         root = tk.Tk()
