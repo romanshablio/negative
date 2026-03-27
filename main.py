@@ -5,8 +5,10 @@ import locale
 import math
 import subprocess
 import sys
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from xml.sax.saxutils import escape as xml_escape
 
 DEFAULT_WIDTH_MM = 120.0
 DEFAULT_RELIEF_HEIGHT_MM = 2.0
@@ -51,6 +53,7 @@ GUI_TRANSLATIONS: dict[str, dict[str, str]] = {
         "toggle_gcode": "G-code",
         "toggle_obj": "OBJ mesh",
         "toggle_stl": "STL mesh",
+        "toggle_3mf": "3MF package",
         "toggle_invert": "Invert source image",
         "toggle_autocontrast": "Auto contrast",
         "field_gamma": "Gamma",
@@ -89,11 +92,13 @@ GUI_TRANSLATIONS: dict[str, dict[str, str]] = {
         "status_layers": "Layers: {layers}, segments: {segments}, filament: {filament:.3f} m",
         "status_obj": "OBJ mesh: {path}",
         "status_stl": "STL mesh: {path}",
+        "status_3mf": "3MF package: {path}",
         "status_mesh": "Mesh: {vertices} vertices, {triangles} triangles",
         "msg_heightmap_saved": "Heightmap saved to {path}",
         "msg_gcode_saved": "G-code saved to {path}",
         "msg_obj_saved": "OBJ saved to {path}",
         "msg_stl_saved": "STL saved to {path}",
+        "msg_3mf_saved": "3MF saved to {path}",
         "label_width": "Width",
         "label_relief_height_short": "Relief height",
         "label_base_thickness_short": "Base thickness",
@@ -134,6 +139,7 @@ GUI_TRANSLATIONS: dict[str, dict[str, str]] = {
         "toggle_gcode": "G-code",
         "toggle_obj": "OBJ mesh",
         "toggle_stl": "STL mesh",
+        "toggle_3mf": "3MF package",
         "toggle_invert": "Инвертировать изображение",
         "toggle_autocontrast": "Автоконтраст",
         "field_gamma": "Гамма",
@@ -172,11 +178,13 @@ GUI_TRANSLATIONS: dict[str, dict[str, str]] = {
         "status_layers": "Слоев: {layers}, сегментов: {segments}, филамента: {filament:.3f} м",
         "status_obj": "OBJ mesh: {path}",
         "status_stl": "STL mesh: {path}",
+        "status_3mf": "3MF package: {path}",
         "status_mesh": "Сетка: {vertices} вершин, {triangles} треугольников",
         "msg_heightmap_saved": "Карта высот сохранена в {path}",
         "msg_gcode_saved": "G-code сохранен в {path}",
         "msg_obj_saved": "OBJ сохранен в {path}",
         "msg_stl_saved": "STL сохранен в {path}",
+        "msg_3mf_saved": "3MF сохранен в {path}",
         "label_width": "Ширина",
         "label_relief_height_short": "Высота рельефа",
         "label_base_thickness_short": "Толщина базы",
@@ -205,7 +213,7 @@ GUI_FIELD_HELP: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "output_folder": (
             "Output folder",
-            "Directory where the app will save the preview PNG, G-code and optional OBJ or STL files.",
+            "Directory where the app will save the preview PNG, G-code and optional OBJ, STL or 3MF files.",
         ),
         "language": (
             "Language",
@@ -222,6 +230,10 @@ GUI_FIELD_HELP: dict[str, dict[str, tuple[str, str]]] = {
         "export_stl": (
             "STL export",
             "Creates an STL mesh of the relief. Useful for slicers and CAD or printing workflows.",
+        ),
+        "export_3mf": (
+            "3MF export",
+            "Creates a zipped 3MF package with the generated mesh. Useful for slicers that prefer 3MF over STL.",
         ),
         "invert": (
             "Invert source image",
@@ -309,7 +321,7 @@ GUI_FIELD_HELP: dict[str, dict[str, tuple[str, str]]] = {
         ),
         "output_folder": (
             "Папка вывода",
-            "Сюда будут сохранены превью PNG, G-code и при необходимости файлы OBJ или STL.",
+            "Сюда будут сохранены превью PNG, G-code и при необходимости файлы OBJ, STL или 3MF.",
         ),
         "language": (
             "Язык",
@@ -326,6 +338,10 @@ GUI_FIELD_HELP: dict[str, dict[str, tuple[str, str]]] = {
         "export_stl": (
             "Экспорт STL",
             "Создает STL-модель рельефа. Удобно для слайсеров и подготовки к печати.",
+        ),
+        "export_3mf": (
+            "Экспорт 3MF",
+            "Создает 3MF-пакет с готовым мешем. Удобно для слайсеров, которые предпочитают 3MF вместо STL.",
         ),
         "invert": (
             "Инвертировать изображение",

@@ -7,7 +7,8 @@
 - `PNG` с preview карты высот;
 - `G-code` для FDM-принтера;
 - `OBJ` mesh;
-- `STL` mesh.
+- `STL` mesh;
+- `3MF` package.
 
 Приложение подходит для сценария, когда нужно превратить негатив или обычное grayscale-изображение в печатный рельеф.
 
@@ -25,7 +26,7 @@
 2. при необходимости инвертирует его;
 3. сглаживает и нормализует тон;
 4. строит heightmap;
-5. по этой карте высот создает `G-code`, `OBJ`, `STL` и preview `PNG`.
+5. по этой карте высот создает `G-code`, `OBJ`, `STL`, `3MF` и preview `PNG`.
 
 ## Что получается на выходе
 
@@ -34,7 +35,8 @@
 - `<image>_heightmap.png` - preview карты высот;
 - `<image>.gcode` - файл для печати;
 - `<image>.obj` - mesh-модель;
-- `<image>.stl` - mesh-модель для слайсеров и 3D-редакторов.
+- `<image>.stl` - mesh-модель для слайсеров и 3D-редакторов;
+- `<image>.3mf` - 3MF-пакет с мешем модели.
 
 ## Требования
 
@@ -92,7 +94,7 @@ python3 main.py negative.jpg --gui
 
 - выбрать входное изображение;
 - выбрать папку для результата;
-- включить или выключить экспорт `G-code`, `OBJ`, `STL`;
+- включить или выключить экспорт `G-code`, `OBJ`, `STL`, `3MF`;
 - настроить размер рельефа;
 - настроить высоту рельефа и толщину базы;
 - настроить сглаживание, гамму и инверсию;
@@ -121,22 +123,31 @@ python3 main.py negative.jpg
 python3 main.py negative.jpg
 ```
 
-Сгенерировать `G-code`, `OBJ` и `STL`:
+Сгенерировать `G-code`, `OBJ`, `STL` и `3MF`:
 
 ```bash
 python3 main.py negative.jpg \
   --obj-out output/relief.obj \
   --stl-out output/relief.stl \
+  --3mf-out output/relief.3mf \
   --gcode-out output/relief.gcode
 ```
 
-Сгенерировать только mesh без `G-code`:
+Сгенерировать только 3D-модели без `G-code`:
 
 ```bash
 python3 main.py negative.jpg \
   --no-gcode \
   --obj-out output/relief.obj \
-  --stl-out output/relief.stl
+  --stl-out output/relief.stl \
+  --3mf-out output/relief.3mf
+```
+
+Сгенерировать только `STL` или только `3MF` из картинки:
+
+```bash
+python3 main.py image.jpg --no-gcode --stl-out output/model.stl
+python3 main.py image.jpg --no-gcode --3mf-out output/model.3mf
 ```
 
 Пример с параметрами печати и обработки:
@@ -153,6 +164,7 @@ python3 main.py negative.jpg \
   --blur-radius 0.8 \
   --obj-out output/relief.obj \
   --stl-out output/relief.stl \
+  --3mf-out output/relief.3mf \
   --gcode-out output/relief.gcode
 ```
 
@@ -187,6 +199,7 @@ python3 main.py negative.jpg \
 - `--no-gcode` - не создавать `G-code`.
 - `--obj-out` - путь к `OBJ`.
 - `--stl-out` - путь к `STL`.
+- `--3mf-out` - путь к `3MF`.
 - `--heightmap-out` - путь к preview `PNG`.
 - `--gcode-out` - путь к `G-code`.
 
@@ -210,7 +223,7 @@ python3 main.py negative.jpg \
 3. Сначала сгенерируй preview heightmap.
 4. Проверь, что светлые и темные области дают нужный рельеф.
 5. При необходимости скорректируй `gamma`, `blur`, `autocontrast`, `relief-height`.
-6. После этого генерируй `G-code` или `STL`.
+6. После этого генерируй `G-code`, `STL` или `3MF`.
 7. Перед реальной печатью открой результат в слайсере или G-code viewer.
 
 ## На что обратить внимание перед печатью
@@ -218,7 +231,7 @@ python3 main.py negative.jpg \
 - `G-code` универсальный и не содержит стартового профиля именно под твой принтер.
 - Температуры, скорости и стартовые координаты стоит проверить под свою машину.
 - Перед реальной печатью обязательно посмотри превью слоев в слайсере.
-- Для больших изображений `OBJ` и особенно `STL` могут получаться тяжелыми.
+- Для больших изображений `OBJ`, `STL` и `3MF` могут получаться тяжелыми.
 
 ## Troubleshooting
 
