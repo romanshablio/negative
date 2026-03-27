@@ -490,7 +490,6 @@ class GenerationSummary:
     gcode_path: Path | None
     obj_path: Path | None
     stl_path: Path | None
-    threemf_path: Path | None
     gcode_stats: GCodeStats | None
     mesh_vertices: int | None
     mesh_faces: int | None
@@ -648,15 +647,11 @@ def default_gcode_output(input_path: Path) -> Path:
     return input_path.with_suffix(".gcode")
 
 
-def default_threemf_output(input_path: Path) -> Path:
-    return input_path.with_suffix(".3mf")
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Convert a negative image into a printable heightmap, mesh and layered G-code "
-            "for an FDM printer, with optional STL, OBJ and 3MF mesh exports."
+            "for an FDM printer."
         )
     )
     parser.add_argument(
@@ -689,12 +684,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--stl-out",
         type=Path,
         help="Output STL mesh path. Not generated unless this flag is set.",
-    )
-    parser.add_argument(
-        "--3mf-out",
-        dest="threemf_out",
-        type=Path,
-        help="Output 3MF package path. Not generated unless this flag is set.",
     )
     parser.add_argument(
         "--no-gcode",
@@ -980,9 +969,7 @@ def add_face(
 def build_mesh(heightmap: HeightmapResult) -> MeshData:
     np, _, _, _ = load_runtime_dependencies()
     rows, cols = heightmap.total_heights_mm.shape
-    # Images use a top-left origin, while the generated model uses a bottom-left origin.
-    # Flip rows here so exported meshes preserve the original image orientation.
-    corner_heights = corner_heights_from_cells(np.flipud(heightmap.total_heights_mm))
+    corner_heights = corner_heights_from_cells(heightmap.total_heights_mm)
     x_coords = np.linspace(0.0, heightmap.width_mm, cols + 1)
     y_coords = np.linspace(0.0, heightmap.depth_mm, rows + 1)
 
@@ -1094,72 +1081,6 @@ def write_ascii_stl(mesh: MeshData, output_path: Path) -> None:
         handle.write(f"endsolid {solid_name}\n")
 
 
-def build_3mf_model_xml(mesh: MeshData, model_name: str) -> str:
-    vertex_lines = [
-        f'        <vertex x="{x_mm:.6f}" y="{y_mm:.6f}" z="{z_mm:.6f}" />'
-        for x_mm, y_mm, z_mm in mesh.vertices
-    ]
-    triangle_lines = [
-        f'        <triangle v1="{a}" v2="{b}" v3="{c}" />'
-        for a, b, c in mesh.faces
-    ]
-    escaped_name = xml_escape(model_name)
-    return "\n".join(
-        [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            '<model unit="millimeter" xml:lang="en-US" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">',
-            f'  <metadata name="Application">Negative To Relief</metadata>',
-            f'  <metadata name="Title">{escaped_name}</metadata>',
-            "  <resources>",
-            f'    <object id="1" type="model" name="{escaped_name}">',
-            "      <mesh>",
-            "        <vertices>",
-            *vertex_lines,
-            "        </vertices>",
-            "        <triangles>",
-            *triangle_lines,
-            "        </triangles>",
-            "      </mesh>",
-            "    </object>",
-            "  </resources>",
-            "  <build>",
-            '    <item objectid="1" />',
-            "  </build>",
-            "</model>",
-            "",
-        ]
-    )
-
-
-def write_3mf(mesh: MeshData, output_path: Path) -> None:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    model_xml = build_3mf_model_xml(mesh, output_path.stem)
-    content_types_xml = "\n".join(
-        [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
-            '  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml" />',
-            '  <Default Extension="model" ContentType="application/vnd.ms-package.3dmanufacturing-3dmodel+xml" />',
-            "</Types>",
-            "",
-        ]
-    )
-    relationships_xml = "\n".join(
-        [
-            '<?xml version="1.0" encoding="UTF-8"?>',
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">',
-            '  <Relationship Target="/3D/3dmodel.model" Id="rel0" Type="http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel" />',
-            "</Relationships>",
-            "",
-        ]
-    )
-
-    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", content_types_xml)
-        archive.writestr("_rels/.rels", relationships_xml)
-        archive.writestr("3D/3dmodel.model", model_xml)
-
-
 def extrusion_for_segment(
     segment_length_mm: float,
     line_width_mm: float,
@@ -1198,7 +1119,6 @@ def travel_move(
 def generate_gcode(heightmap: HeightmapResult, settings: PrintSettings) -> tuple[str, GCodeStats]:
     np, _, _, _ = load_runtime_dependencies()
     layer_count = max(1, math.ceil(heightmap.total_height_mm / settings.layer_height_mm))
-    oriented_heights = np.flipud(heightmap.total_heights_mm)
     gcode: list[str] = [
         "; Generated by negative-to-relief tool",
         "G21",
@@ -1224,7 +1144,7 @@ def generate_gcode(heightmap: HeightmapResult, settings: PrintSettings) -> tuple
         0.0, heightmap.width_mm, heightmap.total_heights_mm.shape[1] + 1
     )
     y_centers = settings.origin_y_mm + (
-        np.arange(oriented_heights.shape[0]) + 0.5
+        np.arange(heightmap.total_heights_mm.shape[0]) + 0.5
     ) * heightmap.pitch_y_mm
 
     filament_mm = 0.0
@@ -1237,7 +1157,7 @@ def generate_gcode(heightmap: HeightmapResult, settings: PrintSettings) -> tuple
         layer_speed = (
             settings.first_layer_speed_mmpm if layer_number == 1 else settings.print_speed_mmpm
         )
-        mask = oriented_heights >= (layer_z_mm - 1e-9)
+        mask = heightmap.total_heights_mm >= (layer_z_mm - 1e-9)
         gcode.append(f"; Layer {layer_number}/{layer_count}")
         gcode.append(f"G0 Z{layer_z_mm:.3f} F{settings.z_speed_mmpm:.0f}")
 
@@ -1310,7 +1230,6 @@ def generate_outputs(
     gcode_out: Path | None,
     obj_out: Path | None,
     stl_out: Path | None,
-    threemf_out: Path | None,
 ) -> GenerationSummary:
     preflight_python_imports()
     heightmap = build_heightmap(heightmap_settings, line_width_mm=print_settings.line_width_mm)
@@ -1325,14 +1244,12 @@ def generate_outputs(
         write_text_file(gcode_out, gcode)
 
     mesh: MeshData | None = None
-    if obj_out is not None or stl_out is not None or threemf_out is not None:
+    if obj_out is not None or stl_out is not None:
         mesh = build_mesh(heightmap)
         if obj_out is not None:
             write_obj(mesh, obj_out)
         if stl_out is not None:
             write_ascii_stl(mesh, stl_out)
-        if threemf_out is not None:
-            write_3mf(mesh, threemf_out)
 
     return GenerationSummary(
         heightmap=heightmap,
@@ -1340,7 +1257,6 @@ def generate_outputs(
         gcode_path=gcode_out,
         obj_path=obj_out,
         stl_path=stl_out,
-        threemf_path=threemf_out,
         gcode_stats=gcode_stats,
         mesh_vertices=len(mesh.vertices) if mesh is not None else None,
         mesh_faces=len(mesh.faces) if mesh is not None else None,
@@ -1409,8 +1325,6 @@ def print_summary(summary: GenerationSummary) -> None:
         print(f"OBJ mesh: {summary.obj_path}")
     if summary.stl_path is not None:
         print(f"STL mesh: {summary.stl_path}")
-    if summary.threemf_path is not None:
-        print(f"3MF package: {summary.threemf_path}")
     if summary.mesh_vertices is not None and summary.mesh_faces is not None:
         print(f"Mesh: {summary.mesh_vertices} vertices, {summary.mesh_faces} triangles")
 
@@ -1438,7 +1352,6 @@ def launch_gui(initial_input: Path | None = None) -> None:
             self.export_gcode_var = tk.BooleanVar(value=True)
             self.export_obj_var = tk.BooleanVar(value=True)
             self.export_stl_var = tk.BooleanVar(value=True)
-            self.export_3mf_var = tk.BooleanVar(value=True)
             self.width_mm_var = tk.StringVar(value=str(DEFAULT_WIDTH_MM))
             self.depth_mm_var = tk.StringVar(value="")
             self.relief_height_var = tk.StringVar(value=str(DEFAULT_RELIEF_HEIGHT_MM))
@@ -1561,16 +1474,12 @@ def launch_gui(initial_input: Path | None = None) -> None:
             export_obj.grid(row=1, column=0, sticky="w")
             export_stl = ttk_module.Checkbutton(outputs_frame, text="", variable=self.export_stl_var)
             export_stl.grid(row=2, column=0, sticky="w")
-            export_3mf = ttk_module.Checkbutton(outputs_frame, text="", variable=self.export_3mf_var)
-            export_3mf.grid(row=3, column=0, sticky="w")
             self.register_translatable(export_gcode, "toggle_gcode")
             self.register_translatable(export_obj, "toggle_obj")
             self.register_translatable(export_stl, "toggle_stl")
-            self.register_translatable(export_3mf, "toggle_3mf")
             self.register_help(export_gcode, "export_gcode")
             self.register_help(export_obj, "export_obj")
             self.register_help(export_stl, "export_stl")
-            self.register_help(export_3mf, "export_3mf")
 
             tone_frame = ttk_module.LabelFrame(content, text="", padding=12)
             tone_frame.grid(row=1, column=1, sticky="nsew", padx=(6, 0), pady=(0, 10))
@@ -1846,9 +1755,7 @@ def launch_gui(initial_input: Path | None = None) -> None:
             if path:
                 self.output_dir_var.set(path)
 
-        def build_settings(
-            self,
-        ) -> tuple[HeightmapSettings, PrintSettings, Path, Path | None, Path | None, Path | None, Path | None]:
+        def build_settings(self) -> tuple[HeightmapSettings, PrintSettings, Path, Path | None, Path | None, Path | None]:
             input_path = Path(self.input_path_var.get()).expanduser().resolve()
             if not input_path.exists():
                 raise ValueError(self.tr("error_input_missing", path=input_path))
@@ -1861,7 +1768,6 @@ def launch_gui(initial_input: Path | None = None) -> None:
             gcode_out = output_dir / f"{stem}.gcode" if self.export_gcode_var.get() else None
             obj_out = output_dir / f"{stem}.obj" if self.export_obj_var.get() else None
             stl_out = output_dir / f"{stem}.stl" if self.export_stl_var.get() else None
-            threemf_out = output_dir / f"{stem}.3mf" if self.export_3mf_var.get() else None
 
             heightmap_settings = HeightmapSettings(
                 input_path=input_path,
@@ -1916,7 +1822,7 @@ def launch_gui(initial_input: Path | None = None) -> None:
                 fan_speed=fan_speed,
             )
 
-            return heightmap_settings, print_settings, heightmap_out, gcode_out, obj_out, stl_out, threemf_out
+            return heightmap_settings, print_settings, heightmap_out, gcode_out, obj_out, stl_out
 
         def update_preview(self, heightmap_path: Path) -> None:
             if self.preview_label is None:
@@ -1970,8 +1876,6 @@ def launch_gui(initial_input: Path | None = None) -> None:
                 self.append_status(self.tr("status_obj", path=summary.obj_path))
             if summary.stl_path is not None:
                 self.append_status(self.tr("status_stl", path=summary.stl_path))
-            if summary.threemf_path is not None:
-                self.append_status(self.tr("status_3mf", path=summary.threemf_path))
             if summary.mesh_vertices is not None and summary.mesh_faces is not None:
                 self.append_status(
                     self.tr(
@@ -1988,8 +1892,6 @@ def launch_gui(initial_input: Path | None = None) -> None:
                 message_lines.append(self.tr("msg_obj_saved", path=summary.obj_path))
             if summary.stl_path is not None:
                 message_lines.append(self.tr("msg_stl_saved", path=summary.stl_path))
-            if summary.threemf_path is not None:
-                message_lines.append(self.tr("msg_3mf_saved", path=summary.threemf_path))
             messagebox_module.showinfo(self.tr("info_generation_completed"), "\n".join(message_lines))
 
     try:
@@ -2021,7 +1923,6 @@ def run_cli(args: argparse.Namespace) -> None:
         gcode_out = args.gcode_out.expanduser().resolve() if args.gcode_out else default_gcode_output(input_path)
     obj_out = args.obj_out.expanduser().resolve() if args.obj_out else None
     stl_out = args.stl_out.expanduser().resolve() if args.stl_out else None
-    threemf_out = args.threemf_out.expanduser().resolve() if args.threemf_out else None
 
     summary = generate_outputs(
         heightmap_settings=heightmap_settings,
@@ -2030,7 +1931,6 @@ def run_cli(args: argparse.Namespace) -> None:
         gcode_out=gcode_out,
         obj_out=obj_out,
         stl_out=stl_out,
-        threemf_out=threemf_out,
     )
     print_summary(summary)
 
