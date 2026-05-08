@@ -1,127 +1,123 @@
 # Negative To Relief
 
-`Negative To Relief` это приложение на Python для подготовки рельефов к 3D-печати.
+Negative To Relief is a Python application for preparing relief models for 3D printing.
 
-Оно берет изображение, превращает его в карту высот и может сохранить результат в нескольких форматах:
+It takes an image, converts it into a height map, and can export the result in several formats:
 
-- `PNG` с preview карты высот;
-- `G-code` для FDM-принтера;
-- `OBJ` mesh;
-- `STL` mesh.
+- PNG heightmap preview.
+- G-code for FDM printers.
+- OBJ mesh.
+- STL mesh.
 
-Приложение подходит для сценария, когда нужно превратить негатив или обычное grayscale-изображение в печатный рельеф.
+The application is useful when a negative image, grayscale picture, or regular image needs to be converted into a printable relief.
 
-## Что делает приложение
+## What the Application Does
 
-На вход подается изображение:
+The input can be:
 
-- негатив;
-- обычное черно-белое изображение;
-- grayscale-картинка, где яркость определяет высоту.
+- A negative image.
+- A regular black-and-white image.
+- A grayscale image where brightness controls height.
 
-Дальше приложение:
+Processing steps:
 
-1. переводит изображение в grayscale;
-2. при необходимости инвертирует его;
-3. сглаживает и нормализует тон;
-4. строит heightmap;
-5. по этой карте высот создает `G-code`, `OBJ`, `STL` и preview `PNG`.
+1. Convert the image to grayscale.
+2. Invert it when needed.
+3. Smooth and normalize tones.
+4. Build a heightmap.
+5. Generate G-code, OBJ, STL, and a preview PNG.
 
-## Что получается на выходе
+## Output
 
-В зависимости от выбранного режима и параметров можно получить:
+Depending on the selected mode and parameters, the application can create:
 
-- `<image>_heightmap.png` - preview карты высот;
-- `<image>.gcode` - файл для печати;
-- `<image>.obj` - mesh-модель;
-- `<image>.stl` - mesh-модель для слайсеров и 3D-редакторов.
+- `<image>_heightmap.png` - heightmap preview.
+- `<image>.gcode` - printer file.
+- `<image>.obj` - mesh model.
+- `<image>.stl` - mesh model for slicers and 3D editors.
 
-## Требования
+## Requirements
 
-- Python 3.13+;
-- `numpy`;
-- `Pillow`;
-- для GUI нужен рабочий `tkinter`.
+- Python 3.13 or newer.
+- `numpy`.
+- `Pillow`.
+- Working `tkinter` for the GUI.
 
-Установка зависимостей:
+Install dependencies:
 
 ```bash
 python3 -m pip install -r requirements.txt
 ```
 
-## Рекомендуемый запуск
+## Recommended Launch
 
-Если у тебя настроено виртуальное окружение, лучше запускать из него:
+If a virtual environment is configured, run the app from it:
 
 ```bash
 source .venv/bin/activate
 python main.py
 ```
 
-или:
+Or start with a selected image:
 
 ```bash
 source .venv/bin/activate
 python main.py image.jpg
 ```
 
-## Режимы работы
+## Modes
 
-Есть два режима:
+The application has two modes:
 
-- GUI;
+- GUI.
 - CLI.
 
 ## GUI
 
-Самый удобный вариант для повседневной работы.
-
-Запуск:
+The GUI is the easiest option for everyday use.
 
 ```bash
 python3 main.py
 ```
 
-Или сразу с выбранным файлом:
+Or:
 
 ```bash
 python3 main.py negative.jpg --gui
 ```
 
-В интерфейсе можно:
+In the interface, you can:
 
-- выбрать входное изображение;
-- выбрать папку для результата;
-- включить или выключить экспорт `G-code`, `OBJ`, `STL`;
-- настроить размер рельефа;
-- настроить высоту рельефа и толщину базы;
-- настроить сглаживание, гамму и инверсию;
-- задать параметры печати.
+- Select the input image.
+- Select the output folder.
+- Enable or disable G-code, OBJ, and STL export.
+- Configure relief size.
+- Configure relief height and base thickness.
+- Configure smoothing, gamma, and inversion.
+- Set print parameters.
 
 ## CLI
 
-CLI удобен для повторяемых запусков, автоматизации и точных параметров.
-
-Базовый запуск:
+The CLI is useful for repeatable runs, automation, and exact parameters.
 
 ```bash
 python3 main.py negative.jpg
 ```
 
-По умолчанию рядом с исходным изображением будут сохранены:
+By default, the following files are saved next to the source image:
 
 - `negative_heightmap.png`
 - `negative.gcode`
 
-## Примеры CLI
+## CLI Examples
 
-Сгенерировать только preview и `G-code`:
+Generate preview and G-code:
 
 ```bash
 python3 main.py negative.jpg
 ```
 
-Сгенерировать `G-code`, `OBJ` и `STL`:
+Generate G-code, OBJ, and STL:
 
 ```bash
 python3 main.py negative.jpg \
@@ -130,7 +126,7 @@ python3 main.py negative.jpg \
   --gcode-out output/relief.gcode
 ```
 
-Сгенерировать только mesh без `G-code`:
+Generate only mesh files without G-code:
 
 ```bash
 python3 main.py negative.jpg \
@@ -139,7 +135,7 @@ python3 main.py negative.jpg \
   --stl-out output/relief.stl
 ```
 
-Пример с параметрами печати и обработки:
+Example with processing and print parameters:
 
 ```bash
 python3 main.py negative.jpg \
@@ -156,115 +152,65 @@ python3 main.py negative.jpg \
   --gcode-out output/relief.gcode
 ```
 
-## Самые важные параметры
+## Important Parameters
 
-### Геометрия
+### Geometry
 
-- `--width-mm` - физическая ширина модели.
-- `--depth-mm` - физическая глубина модели. Если не указать, она считается по пропорциям изображения.
-- `--relief-height-mm` - максимальная высота рельефа над базой.
-- `--base-thickness-mm` - толщина сплошной подложки.
+- +--width-mm` - physical model width.
+- +--depth-mm` - physical model depth. If omitted, it is calculated from image proportions.
+- +--relief-height-mm` - maximum relief height above the base.
+- +--base-thickness-mm` - solid base thickness.
 
-### Качество и детализация
+### Quality and Detail
 
-- `--resolution-x` и `--resolution-y` - разрешение сетки heightmap.
-- `--blur-radius` - сглаживание, полезно для шумных изображений.
-- `--gamma` - усиление или ослабление контраста по высоте.
-- `--autocontrast` - автоматическая растяжка тонального диапазона.
+- +--resolution-x` and +--resolution-y` - heightmap grid resolution.
+- +--blur-radius` - smoothing for noisy images.
+- +--gamma` - contrast adjustment by height.
+- +--autocontrast` - automatic tonal range stretching.
 
-### Инверсия
+### Inversion
 
-По умолчанию приложение предполагает, что подается негатив, и инвертирует изображение.
+By default, the application assumes that the input is a negative and inverts it.
 
-Если исходник уже является обычной картой высот или позитивом, используй:
+If the source is already a regular heightmap or positive image, use:
 
 ```bash
 --no-invert
 ```
 
-### Экспорт
+### Export
 
-- `--no-gcode` - не создавать `G-code`.
-- `--obj-out` - путь к `OBJ`.
-- `--stl-out` - путь к `STL`.
-- `--heightmap-out` - путь к preview `PNG`.
-- `--gcode-out` - путь к `G-code`.
+- +--no-gcode` - do not create G-code.
+- +--obj-out` - OBJ output path.
+- +--stl-out` - STL output path.
+- +--heightmap-out` - preview PNG output path.
+- +--gcode-out` - G-code output path.
 
-### Параметры печати
+### Print Parameters
 
-- `--line-width-mm` - ширина линии экструзии.
-- `--layer-height-mm` - высота слоя.
-- `--filament-diameter-mm` - диаметр филамента.
-- `--print-speed` - скорость печати.
-- `--first-layer-speed` - скорость первого слоя.
-- `--travel-speed` - скорость холостых перемещений.
-- `--z-speed` - скорость по оси `Z`.
-- `--z-hop-mm` - высота `Z-hop`.
-- `--origin-x-mm`, `--origin-y-mm` - стартовая позиция на столе.
-- `--nozzle-temperature`, `--bed-temperature`, `--fan-speed` - базовые параметры печати.
+- +--line-width-mm` - extrusion line width.
+- +--layer-height-mm` - layer height.
+- +--filament-diameter-mm` - filament diameter.
+- +--print-speed` - print speed.
+- +--first-layer-speed` - first layer speed.
+- +--travel-speed` - travel speed.
+- +--z-speed` - Z-axis speed.
+- +--z-hop-mm` - Z-hop height.
+- +--origin-x-mm`, +--origin-y-mm` - start position on the print bed.
+- +--nozzle-temperature`, +--bed-temperature`, +--fan-speed` - basic print settings.
 
-## Рекомендуемый порядок работы
+## Recommended Workflow
 
-1. Возьми изображение с хорошим контрастом.
-2. Запусти GUI или CLI.
-3. Сначала сгенерируй preview heightmap.
-4. Проверь, что светлые и темные области дают нужный рельеф.
-5. При необходимости скорректируй `gamma`, `blur`, `autocontrast`, `relief-height`.
-6. После этого генерируй `G-code` или `STL`.
-7. Перед реальной печатью открой результат в слайсере или G-code viewer.
+1. Use an image with good contrast.
+2. Start the GUI or CLI.
+3. Generate a heightmap preview first.
+4. Check that light and dark areas create the intended relief.
+5. Adjust gamma, blur, autocontrast, and relief height if needed.
+6. Generate G-code or STL.
+7. Before printing, inspect the result in a slicer or G-code viewer.
 
-## На что обратить внимание перед печатью
+## Before Printing
 
-- `G-code` универсальный и не содержит стартового профиля именно под твой принтер.
-- Температуры, скорости и стартовые координаты стоит проверить под свою машину.
-- Перед реальной печатью обязательно посмотри превью слоев в слайсере.
-- Для больших изображений `OBJ` и особенно `STL` могут получаться тяжелыми.
-
-## Troubleshooting
-
-### Ошибка про несовместимую версию macOS
-
-Если видишь что-то вроде:
-
-```text
-macOS 26 (...) or later required
-```
-
-обычно это значит, что `numpy`, `Pillow` или `Tk` установлены в виде бинарников, собранных под более новый macOS.
-
-Попробуй:
-
-```bash
-python3 -m pip uninstall -y numpy pillow
-python3 -m pip install --no-binary=:all: numpy pillow
-```
-
-Если проблема именно в GUI, проверь, что Python установлен с рабочим `tkinter`.
-
-### GUI не запускается
-
-Если приложение пишет, что GUI не может стартовать безопасно, чаще всего причина одна из этих:
-
-- в Python нет `tkinter`;
-- `Tk` несовместим с текущим macOS;
-- используется не тот Python, из которого создавалось рабочее окружение.
-
-В таком случае:
-
-1. попробуй запуск из рабочего `venv`;
-2. если не помогает, используй CLI;
-3. при необходимости поставь совместимый Python и пересоздай `venv`.
-
-## Коротко
-
-Если нужен самый простой сценарий:
-
-```bash
-python3 main.py
-```
-
-Если нужен управляемый сценарий через консоль:
-
-```bash
-python3 main.py image.jpg --obj-out out/model.obj --stl-out out/model.stl
-```
+- Generated G-code is generic and does not include a printer-specific start profile.
+- Temperatures, speeds, and start coordinates should be checked for your machine.
+- Always inspect layer preview in a slicer before a real print.
